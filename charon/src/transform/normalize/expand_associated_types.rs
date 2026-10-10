@@ -834,25 +834,26 @@ impl<'a> ComputeItemModifications<'a> {
                 .any(|pat| pat.matches(&self.ctx.translated, &tr.item_meta.name))
     }
 
-    /// Whether `a` and `b` are in the same cycle of traits through their clauses.
-    fn in_cycle(&self, a: TraitDeclId, b: TraitDeclId) -> bool {
-        let reaches = |from: TraitDeclId, to: TraitDeclId| {
-            let mut seen = HashSet::default();
-            let mut todo = vec![from];
-            while let Some(id) = todo.pop() {
-                if id == to {
-                    return true;
-                }
-                if seen.insert(id)
-                    && let Some(tr) = self.ctx.translated.trait_decls.get(id)
-                {
-                    let clauses = tr.generics.trait_clauses.iter().chain(&tr.implied_clauses);
-                    todo.extend(clauses.map(|c| c.trait_.skip_binder.id));
-                }
+    /// Whether this path from `Self` in trait `id` goes around a cycle: some clause on the way
+    /// is again an `id` clause.
+    fn goes_around(&self, id: TraitDeclId, path: &AssocTypePath) -> bool {
+        let mut trait_id = id;
+        for clause_id in &path.tref.parent_path {
+            let Some(clause) = self
+                .ctx
+                .translated
+                .trait_decls
+                .get(trait_id)
+                .and_then(|tr| tr.implied_clauses.get(*clause_id))
+            else {
+                return false;
+            };
+            trait_id = clause.trait_.skip_binder.id;
+            if trait_id == id {
+                return true;
             }
-            false
-        };
-        reaches(a, b) && reaches(b, a)
+        }
+        false
     }
 
     /// Compute the modifications needed for this trait.
@@ -931,12 +932,11 @@ impl<'a> ComputeItemModifications<'a> {
                     }
                 }
                 for path in replace {
-                    // In a cycle, a path into a trait of the cycle would give us ever longer
-                    // paths around it (`Self::A::B::A::B::Type`): make those associated types.
+                    // In a cycle, a path going around it would give us ever longer paths
+                    // (`Self::A::B::A::B::Type`): make those associated types.
                     if is_self_referential
                         && modifications.add_type_params
-                        && !path.tref.parent_path.is_empty()
-                        && self.in_cycle(path.tref.trait_decl_id, id)
+                        && self.goes_around(id, &path)
                     {
                         modifications.replace_cyclic_path(path);
                     } else {

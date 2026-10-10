@@ -37,40 +37,40 @@ pub trait Copy<Self>
 struct () {}
 
 // Full name: test_crate::Proj
-pub trait Proj<Self, Self_Scalar, Self_Base, Self_Affine>
+pub trait Proj<Self, Self_Scalar, Self_Base, Self_Affine, Self_Clause5_Base>
 {
     proof ImpliedClause0: (Self: Sized)
     proof ImpliedClause1: (Self_Scalar: Sized)
     proof ImpliedClause2: (Self_Scalar: Copy)
     proof ImpliedClause3: (Self_Base: Sized)
     proof ImpliedClause4: (Self_Affine: Sized)
-    proof ImpliedClause5: (Self_Affine: Affine<Self_Scalar, Self::Self_Clause5_Base, Self, Self::Self_Clause5_Clause5_Base>)
-    type Self_Clause5_Base
+    proof ImpliedClause5: (Self_Affine: Affine<Self_Scalar, Self_Clause5_Base, Self, Self::Self_Clause5_Clause5_Base, Self::Self_Clause5_Clause5_Clause5_Base>)
     type Self_Clause5_Clause5_Base
+    type Self_Clause5_Clause5_Clause5_Base
     fn scalar<'_0_1>;
     non-dyn-compatible
 }
 
 // Full name: test_crate::Affine
-pub trait Affine<Self, Self_Scalar, Self_Base, Self_Proj, Self_Clause5_Base>
+pub trait Affine<Self, Self_Scalar, Self_Base, Self_Proj, Self_Clause5_Base, Self_Clause5_Clause5_Base>
 {
     proof ImpliedClause0: (Self: Sized)
     proof ImpliedClause1: (Self_Scalar: Sized)
     proof ImpliedClause2: (Self_Scalar: Copy)
     proof ImpliedClause3: (Self_Base: Sized)
     proof ImpliedClause4: (Self_Proj: Sized)
-    proof ImpliedClause5: (Self_Proj: Proj<Self_Scalar, Self_Clause5_Base, Self>)
+    proof ImpliedClause5: (Self_Proj: Proj<Self_Scalar, Self_Clause5_Base, Self, Self_Clause5_Clause5_Base>)
     fn get<'_0_1>;
     non-dyn-compatible
 }
 
 // Full name: test_crate::scalar
-pub fn scalar<'_0, F, A, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base>(a: &'_0 A) -> F
+pub fn scalar<'_0, F, A, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base, Clause3_Clause5_Clause5_Base>(a: &'_0 A) -> F
 where
     TraitClause0: (F: Sized),
     TraitClause1: (A: Sized),
     TraitClause2: (F: Copy),
-    TraitClause3: (A: Affine<F, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base>),
+    TraitClause3: (A: Affine<F, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base, Clause3_Clause5_Clause5_Base>),
     TypeOutlives0: A: '_0,
 {
     let _0: F; // return

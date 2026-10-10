@@ -352,50 +352,50 @@ impl "impl_Bar_for_unit" test_crate::loopy::Bar<bool> for () {
     vtable: lazy
 }
 
-trait test_crate::loopy::Foo<Self>
+trait test_crate::loopy::Foo<Self, Self_FooTy, Self_Clause3_BarTy>
 {
     proof ImpliedClause0: (Self: MetaSized)
-    proof ImpliedClause1: (Self::FooTy: Sized)
-    proof ImpliedClause2: (Self::FooTy: test_crate::loopy::Foo)
-    proof ImpliedClause3: (Self::FooTy: test_crate::loopy::Bar<Self::Self_Clause3_BarTy>)
-    type FooTy
-    type Self_Clause3_BarTy
-    vtable: test_crate::loopy::Foo::{vtable}<Self::FooTy>
+    proof ImpliedClause1: (Self_FooTy: Sized)
+    proof ImpliedClause2: (Self_FooTy: test_crate::loopy::Foo<Self::Self_Clause2_FooTy, Self::Self_Clause2_Clause3_BarTy>)
+    proof ImpliedClause3: (Self_FooTy: test_crate::loopy::Bar<Self_Clause3_BarTy>)
+    type Self_Clause2_FooTy
+    type Self_Clause2_Clause3_BarTy
+    vtable: test_crate::loopy::Foo::{vtable}<Self_FooTy>
 }
 
-// Full name: test_crate::loopy::{impl test_crate::loopy::Foo for ()}
-impl "impl_Foo_for_unit" test_crate::loopy::Foo for () {
+// Full name: test_crate::loopy::{impl test_crate::loopy::Foo<(), bool> for ()}
+impl "impl_Foo_for_unit" test_crate::loopy::Foo<(), bool> for () {
     proof ImpliedClause0: ((): MetaSized) = {built_in impl MetaSized for ()}
     proof ImpliedClause1: ((): Sized) = {built_in impl Sized for ()}
-    proof ImpliedClause2: ((): test_crate::loopy::Foo) = impl_Foo_for_unit
+    proof ImpliedClause2: ((): test_crate::loopy::Foo<(), bool>) = impl_Foo_for_unit
     proof ImpliedClause3: ((): test_crate::loopy::Bar<bool>) = impl_Bar_for_unit
-    type FooTy = ()
-    type Self_Clause3_BarTy = bool
+    type Self_Clause2_FooTy = ()
+    type Self_Clause2_Clause3_BarTy = bool
     vtable: lazy
 }
 
 // Full name: test_crate::loopy::Baz
-trait Baz<Self, T>
+trait Baz<Self, T, Self_BazTy, Self_Clause3_BarTy>
 {
     proof ImpliedClause0: (Self: MetaSized)
     proof ImpliedClause1: (T: Sized)
-    proof ImpliedClause2: (T: Baz<T>)
-    proof ImpliedClause3: (T: test_crate::loopy::Bar<Self::Self_Clause3_BarTy>)
-    proof ImpliedClause4: (Self::BazTy: Sized)
-    type BazTy
-    type Self_Clause3_BarTy
-    vtable: test_crate::loopy::Baz::{vtable}<T, Self::BazTy>
+    proof ImpliedClause2: (T: Baz<T, Self::Self_Clause2_BazTy, Self::Self_Clause2_Clause3_BarTy>)
+    proof ImpliedClause3: (T: test_crate::loopy::Bar<Self_Clause3_BarTy>)
+    proof ImpliedClause4: (Self_BazTy: Sized)
+    type Self_Clause2_BazTy
+    type Self_Clause2_Clause3_BarTy
+    vtable: test_crate::loopy::Baz::{vtable}<T, Self_BazTy>
 }
 
-// Full name: test_crate::loopy::{impl Baz<()> for ()}
-impl "impl_Baz_unit_for_unit" Baz<()> for () {
+// Full name: test_crate::loopy::{impl Baz<(), usize, bool> for ()}
+impl "impl_Baz_unit_for_unit" Baz<(), usize, bool> for () {
     proof ImpliedClause0: ((): MetaSized) = {built_in impl MetaSized for ()}
     proof ImpliedClause1: ((): Sized) = {built_in impl Sized for ()}
-    proof ImpliedClause2: ((): Baz<()>) = impl_Baz_unit_for_unit
+    proof ImpliedClause2: ((): Baz<(), usize, bool>) = impl_Baz_unit_for_unit
     proof ImpliedClause3: ((): test_crate::loopy::Bar<bool>) = impl_Bar_for_unit
     proof ImpliedClause4: (usize: Sized) = {built_in impl Sized for usize}
-    type BazTy = usize
-    type Self_Clause3_BarTy = bool
+    type Self_Clause2_BazTy = usize
+    type Self_Clause2_Clause3_BarTy = bool
     vtable: lazy
 }
 
@@ -421,27 +421,27 @@ where
     vtable: lazy
 }
 
-trait test_crate::loopy_with_generics::Foo<'b, Self, T>
+trait test_crate::loopy_with_generics::Foo<'b, Self, T, Self_FooTy, Self_Clause4_BarTy>
 {
     proof ImpliedClause0: (Self: MetaSized)
     proof ImpliedClause1: (T: Sized)
-    proof ImpliedClause2: (Self::FooTy: Sized)
-    proof ImpliedClause3: (Self::FooTy: test_crate::loopy_with_generics::Foo<'b, T>)
-    proof ImpliedClause4: (Self::FooTy: test_crate::loopy_with_generics::Bar<'b, u8, Option<T>[Self::ImpliedClause1], Self::Self_Clause4_BarTy>)
-    type FooTy
-    type Self_Clause4_BarTy
-    vtable: test_crate::loopy_with_generics::Foo::{vtable}<'b, T, Self::FooTy>
+    proof ImpliedClause2: (Self_FooTy: Sized)
+    proof ImpliedClause3: (Self_FooTy: test_crate::loopy_with_generics::Foo<'b, T, Self::Self_Clause3_FooTy, Self::Self_Clause3_Clause4_BarTy>)
+    proof ImpliedClause4: (Self_FooTy: test_crate::loopy_with_generics::Bar<'b, u8, Option<T>[Self::ImpliedClause1], Self_Clause4_BarTy>)
+    type Self_Clause3_FooTy
+    type Self_Clause3_Clause4_BarTy
+    vtable: test_crate::loopy_with_generics::Foo::{vtable}<'b, T, Self_FooTy>
 }
 
-// Full name: test_crate::loopy_with_generics::{impl test_crate::loopy_with_generics::Foo<'static, u16> for ()}
-impl "impl_Foo_u16_for_unit" test_crate::loopy_with_generics::Foo<'static, u16> for () {
+// Full name: test_crate::loopy_with_generics::{impl test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]> for ()}
+impl "impl_Foo_u16_for_unit" test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]> for () {
     proof ImpliedClause0: ((): MetaSized) = {built_in impl MetaSized for ()}
     proof ImpliedClause1: (u16: Sized) = {built_in impl Sized for u16}
     proof ImpliedClause2: ((): Sized) = {built_in impl Sized for ()}
-    proof ImpliedClause3: ((): test_crate::loopy_with_generics::Foo<'static, u16>) = impl_Foo_u16_for_unit
+    proof ImpliedClause3: ((): test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]>) = impl_Foo_u16_for_unit
     proof ImpliedClause4: ((): test_crate::loopy_with_generics::Bar<'static, u8, Option<u16>[{built_in impl Sized for u16}], &'_ Option<u16>[{built_in impl Sized for u16}]>) = impl_Bar_u8_for_unit<'_, Option<u16>[{built_in impl Sized for u16}]>[{built_in impl Sized for Option<u16>[{built_in impl Sized for u16}]}]
-    type FooTy = ()
-    type Self_Clause4_BarTy = &'_ Option<u16>[{built_in impl Sized for u16}]
+    type Self_Clause3_FooTy = ()
+    type Self_Clause3_Clause4_BarTy = &'_ Option<u16>[{built_in impl Sized for u16}]
     vtable: lazy
 }
 

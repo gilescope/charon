@@ -25,31 +25,31 @@ pub trait Destruct<Self>
 }
 
 // Full name: test_crate::Ring
-trait Ring<Self, Self_Sub>
+trait Ring<Self, Self_Sub, Self_Clause2_Packing>
 {
     proof ImpliedClause0: (Self: MetaSized)
     proof ImpliedClause1: (Self_Sub: Sized)
-    proof ImpliedClause2: (Self_Sub: Field<Self::Self_Clause2_Packing, Self::Self_Clause2_Clause1_Sub>)
+    proof ImpliedClause2: (Self_Sub: Field<Self_Clause2_Packing, Self::Self_Clause2_Clause1_Sub, Self::Self_Clause2_Clause1_Clause2_Packing>)
     const ZERO : Self
-    type Self_Clause2_Packing
     type Self_Clause2_Clause1_Sub
+    type Self_Clause2_Clause1_Clause2_Packing
     non-dyn-compatible
 }
 
 // Full name: test_crate::Field
-trait Field<Self, Self_Packing, Self_Clause1_Sub>
+trait Field<Self, Self_Packing, Self_Clause1_Sub, Self_Clause1_Clause2_Packing>
 {
     proof ImpliedClause0: (Self: MetaSized)
-    proof ImpliedClause1: (Self: Ring<Self_Clause1_Sub>)
+    proof ImpliedClause1: (Self: Ring<Self_Clause1_Sub, Self_Clause1_Clause2_Packing>)
     proof ImpliedClause2: (Self_Packing: Sized)
     non-dyn-compatible
 }
 
 // Full name: test_crate::zero
-fn zero<R, Clause1_Sub>()
+fn zero<R, Clause1_Sub, Clause1_Clause2_Packing>()
 where
     TraitClause0: (R: Sized),
-    TraitClause1: (R: Ring<Clause1_Sub>),
+    TraitClause1: (R: Ring<Clause1_Sub, Clause1_Clause2_Packing>),
 {
     let _0: (); // return
     let _1: Clause1_Sub; // anonymous local
