@@ -1,0 +1,92 @@
+# Final LLBC before serialization:
+
+// Full name: core::marker::MetaSized
+#[fundamental]
+#[lang_item(MetaSized)]
+pub trait MetaSized<Self>
+
+// Full name: core::marker::Sized
+#[fundamental]
+#[lang_item(Sized)]
+pub trait Sized<Self>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    non-dyn-compatible
+}
+
+// Full name: core::clone::Clone
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
+pub trait Clone<Self>
+{
+    proof ImpliedClause0: (Self: Sized)
+    fn clone<'_0_1>;
+    non-dyn-compatible
+}
+
+// Full name: core::marker::Copy
+#[lang_item(Copy)]
+#[diagnostic_item("Copy")]
+pub trait Copy<Self>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Self: Clone)
+    non-dyn-compatible
+}
+
+struct () {}
+
+// Full name: test_crate::Proj
+pub trait Proj<Self, Self_Scalar, Self_Base, Self_Affine>
+{
+    proof ImpliedClause0: (Self: Sized)
+    proof ImpliedClause1: (Self_Scalar: Sized)
+    proof ImpliedClause2: (Self_Scalar: Copy)
+    proof ImpliedClause3: (Self_Base: Sized)
+    proof ImpliedClause4: (Self_Affine: Sized)
+    proof ImpliedClause5: (Self_Affine: Affine<Self_Scalar, Self::Self_Clause5_Base, Self, Self::Self_Clause5_Clause5_Base>)
+    type Self_Clause5_Base
+    type Self_Clause5_Clause5_Base
+    fn scalar<'_0_1>;
+    non-dyn-compatible
+}
+
+// Full name: test_crate::Affine
+pub trait Affine<Self, Self_Scalar, Self_Base, Self_Proj, Self_Clause5_Base>
+{
+    proof ImpliedClause0: (Self: Sized)
+    proof ImpliedClause1: (Self_Scalar: Sized)
+    proof ImpliedClause2: (Self_Scalar: Copy)
+    proof ImpliedClause3: (Self_Base: Sized)
+    proof ImpliedClause4: (Self_Proj: Sized)
+    proof ImpliedClause5: (Self_Proj: Proj<Self_Scalar, Self_Clause5_Base, Self>)
+    fn get<'_0_1>;
+    non-dyn-compatible
+}
+
+// Full name: test_crate::scalar
+pub fn scalar<'_0, F, A, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base>(a: &'_0 A) -> F
+where
+    TraitClause0: (F: Sized),
+    TraitClause1: (A: Sized),
+    TraitClause2: (F: Copy),
+    TraitClause3: (A: Affine<F, Clause3_Base, Clause3_Proj, Clause3_Clause5_Base>),
+    TypeOutlives0: A: '_0,
+{
+    let _0: F; // return
+    let a: &'1 A; // arg #1
+    let _2: &'2 A; // anonymous local
+
+    storage_live(_0)
+    storage_live(_2)
+    _2 = &(*a)
+    _0 = TraitClause3::get<'3>(move _2)
+    ↳⚡ storage_dead(a)
+        unwind_continue
+    storage_dead(_2)
+    storage_dead(a)
+    return
+}
+
+
+

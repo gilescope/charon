@@ -64,6 +64,11 @@
 //! }
 //! ```
 //!
+//! A trait in a cycle (one whose processing re-enters itself) still turns its own associated types
+//! into parameters: the traits of the cycle assume it does, and we recompute the cycle until that
+//! assumption matches the result. Only the paths that go around the cycle
+//! (`Self::A::B::A::B::Type`) become new associated types as above.
+//!
 //! Limitations:
 //! - we don't track bound lifetimes in quantified clauses properly (<https://github.com/AeneasVerif/charon/issues/534>).
 //! - we don't take into account unicity of trait implementations. This means we won't detect type
@@ -586,6 +591,11 @@ struct ItemModifications {
     /// and turn extra require params into new associated types.
     /// For non-traits, this is always `true`.
     add_type_params: bool,
+    /// For a trait in a cycle which still lifts its associated types (`add_type_params`): the
+    /// paths around the cycle, which become new associated types as for a self-referential
+    /// trait, so that its parameters are its own associated types and the cycle's assumption
+    /// about them holds.
+    cyclic_paths: Vec<AssocTypePath>,
 }
 
 impl ItemModifications {
@@ -596,6 +606,7 @@ impl ItemModifications {
             next_assoc_type_id: None,
             remove_constraints: Default::default(),
             add_type_params,
+            cyclic_paths: Default::default(),
         }
     }
 
@@ -613,6 +624,18 @@ impl ItemModifications {
             // We don't have a value for this associated type; we add a new type parameter
             // to supply it.
             self.required_extra_paths.push(path);
+        }
+    }
+
+    /// Like `replace_path`, for a path around the cycle of a cyclic trait: a missing value
+    /// becomes a new associated type.
+    fn replace_cyclic_path(&mut self, path: AssocTypePath) {
+        if let Some((cstr_id, _)) = self.type_constraints.find_ty_and_used_constraint(&path) {
+            if let Some(cstr_id) = cstr_id {
+                self.remove_constraints.insert(cstr_id);
+            }
+        } else {
+            self.cyclic_paths.push(path);
         }
     }
 
@@ -635,12 +658,10 @@ impl ItemModifications {
     /// Iterate over the paths that require adding new associated types.
     fn required_extra_assoc_types(&self) -> impl Iterator<Item = &AssocTypePath> {
         if self.add_type_params {
-            None
+            self.cyclic_paths.iter()
         } else {
-            Some(self.required_extra_paths())
+            self.required_extra_paths.iter()
         }
-        .into_iter()
-        .flatten()
     }
 
     /// Iterate over the paths that require adding new associated types, paired with the ids of
@@ -648,19 +669,10 @@ impl ItemModifications {
     fn required_extra_assoc_types_with_ids(
         &self,
     ) -> impl Iterator<Item = (&AssocTypePath, AssocTypeId)> {
-        if self.add_type_params {
-            None
-        } else {
-            let next_assoc_type_id = self.next_assoc_type_id.unwrap();
-            Some(
-                self.required_extra_paths
-                    .iter()
-                    .enumerate()
-                    .map(move |(offset, path)| (path, next_assoc_type_id + offset)),
-            )
-        }
-        .into_iter()
-        .flatten()
+        let next_assoc_type_id = self.next_assoc_type_id;
+        self.required_extra_assoc_types()
+            .enumerate()
+            .map(move |(offset, path)| (path, next_assoc_type_id.unwrap() + offset))
     }
 
     /// Iterate over the constraints that a `Self: Trait` clause makes available.
@@ -695,6 +707,10 @@ impl ItemModifications {
     }
 }
 
+/// How many times we recompute a cycle of traits before keeping the associated types of the one
+/// whose parameters keep changing.
+const MAX_CYCLE_ATTEMPTS: usize = 8;
+
 struct ComputeItemModifications<'a> {
     ctx: &'a TransformCtx,
     /// Records the modifications for each trait.
@@ -702,6 +718,17 @@ struct ComputeItemModifications<'a> {
     /// Records the set of known associated types for this trait impl, including parent impls and
     /// associated type constraints.
     impl_assoc_tys: IndexMap<TraitImplId, CycleDetector<TypeConstraintSet>>,
+    /// For a trait re-entered while we compute its modifications (a cycle of traits through
+    /// their clauses), the parameters we assume it gets. We start with its own associated types
+    /// and recompute the cycle until the assumption matches the result.
+    provisional_params: HashMap<TraitDeclId, Vec<AssocTypePath>>,
+    /// Cyclic traits whose parameters did not converge: they keep their associated types.
+    unliftable: HashSet<TraitDeclId>,
+    lift_attempts: HashMap<TraitDeclId, usize>,
+    /// The traits and impls whose computation finished, in order, so that we can undo those
+    /// that relied on a wrong assumption.
+    processed_traits: Vec<TraitDeclId>,
+    processed_impls: Vec<TraitImplId>,
 }
 
 impl<'a> ComputeItemModifications<'a> {
@@ -716,6 +743,11 @@ impl<'a> ComputeItemModifications<'a> {
                 .translated
                 .trait_impls
                 .map_ref_opt(|_| Some(CycleDetector::Unprocessed)),
+            provisional_params: Default::default(),
+            unliftable: Default::default(),
+            lift_attempts: Default::default(),
+            processed_traits: Default::default(),
+            processed_impls: Default::default(),
         }
     }
 
@@ -785,6 +817,44 @@ impl<'a> ComputeItemModifications<'a> {
         modifications
     }
 
+    /// Whether the options ask to turn the associated types of this trait into parameters.
+    fn lifts_assoc_types(&self, tr: &TraitDecl) -> bool {
+        // These traits carry a built-in associated type that we can't replace with anything else
+        // than itself, so we keep it as an associated type.
+        let has_builtin_assoc_ty = matches!(
+            tr.item_meta.lang_item.as_ref(),
+            Some(from_rustc::LangItem::DiscriminantKind | from_rustc::LangItem::PointeeTrait)
+        );
+        !has_builtin_assoc_ty
+            && self
+                .ctx
+                .options
+                .lift_associated_types
+                .iter()
+                .any(|pat| pat.matches(&self.ctx.translated, &tr.item_meta.name))
+    }
+
+    /// Whether `a` and `b` are in the same cycle of traits through their clauses.
+    fn in_cycle(&self, a: TraitDeclId, b: TraitDeclId) -> bool {
+        let reaches = |from: TraitDeclId, to: TraitDeclId| {
+            let mut seen = HashSet::default();
+            let mut todo = vec![from];
+            while let Some(id) = todo.pop() {
+                if id == to {
+                    return true;
+                }
+                if seen.insert(id)
+                    && let Some(tr) = self.ctx.translated.trait_decls.get(id)
+                {
+                    let clauses = tr.generics.trait_clauses.iter().chain(&tr.implied_clauses);
+                    todo.extend(clauses.map(|c| c.trait_.skip_binder.id));
+                }
+            }
+            false
+        };
+        reaches(a, b) && reaches(b, a)
+    }
+
     /// Compute the modifications needed for this trait.
     fn compute_trait_modifications(
         &mut self,
@@ -793,84 +863,116 @@ impl<'a> ComputeItemModifications<'a> {
         if self.trait_modifications[id].start_processing()
             && let Some(tr) = self.ctx.translated.trait_decls.get(id)
         {
-            // The heart of the recursion: we process the trait clauses, which recursively computes
-            // the extra parameters needed for each corresponding trait. Each of the referenced
-            // traits may need to be supplied extra type parameters. `replace_path` either finds
-            // the right type in the type constraints, or records that we need to add new
-            // parameters to this trait's signature.
-            let mut replace = vec![];
-            for clause in &tr.generics.trait_clauses {
-                for path in self.compute_extra_params_for_clause(clause, TraitRefPath::local_clause)
-                {
-                    replace.push(path);
+            let undo_from = (self.processed_traits.len(), self.processed_impls.len());
+            loop {
+                // The heart of the recursion: we process the trait clauses, which recursively computes
+                // the extra parameters needed for each corresponding trait. Each of the referenced
+                // traits may need to be supplied extra type parameters. `replace_path` either finds
+                // the right type in the type constraints, or records that we need to add new
+                // parameters to this trait's signature.
+                let mut replace = vec![];
+                for clause in &tr.generics.trait_clauses {
+                    for path in
+                        self.compute_extra_params_for_clause(clause, TraitRefPath::local_clause)
+                    {
+                        replace.push(path);
+                    }
                 }
-            }
-            for clause in &tr.implied_clauses {
-                for path in
-                    self.compute_extra_params_for_clause(clause, TraitRefPath::parent_clause)
-                {
-                    replace.push(path);
+                for clause in &tr.implied_clauses {
+                    for path in
+                        self.compute_extra_params_for_clause(clause, TraitRefPath::parent_clause)
+                    {
+                        replace.push(path);
+                    }
                 }
-            }
 
-            let is_self_referential = match &self.trait_modifications[id] {
-                CycleDetector::Unprocessed | CycleDetector::Processed(_) => unreachable!(),
-                CycleDetector::Processing => false,
-                CycleDetector::Cyclic => true,
-            };
-            // These traits carry a built-in associated type that we can't replace with
-            // anything else than itself, so we keep it as an associated type.
-            let has_builtin_assoc_ty = matches!(
-                tr.item_meta.lang_item.as_ref(),
-                Some(from_rustc::LangItem::DiscriminantKind | from_rustc::LangItem::PointeeTrait)
-            );
-            let remove_assoc_type = !has_builtin_assoc_ty
-                && self
-                    .ctx
-                    .options
-                    .lift_associated_types
-                    .iter()
-                    .any(|pat| pat.matches(&self.ctx.translated, &tr.item_meta.name));
-            let remove_assoc_types = !is_self_referential && remove_assoc_type;
+                let is_self_referential = match &self.trait_modifications[id] {
+                    CycleDetector::Unprocessed | CycleDetector::Processed(_) => unreachable!(),
+                    CycleDetector::Processing => false,
+                    CycleDetector::Cyclic => true,
+                };
+                let remove_assoc_type = self.lifts_assoc_types(tr);
+                // A self-referential trait lifts its associated types too, if its partners in the cycle
+                // assumed the parameters it ends up with (see `provisional_params`).
+                let remove_assoc_types =
+                    remove_assoc_type && !(is_self_referential && self.unliftable.contains(&id));
 
-            let type_constraints = {
-                let mut type_constraints = self.compute_constraint_set(&tr.generics);
-                let self_tref = TraitRef::new(
-                    TraitRefKind::SelfId,
-                    RegionBinder::empty(TraitDeclRef {
-                        id: tr.def_id,
-                        generics: Box::new(tr.generics.identity_args()),
-                    }),
-                );
-                // Inherit known constraints from implied clauses.
-                for (clause_id, clause) in tr.implied_clauses.iter_enumerated() {
-                    let tref = TraitRef::new(
-                        TraitRefKind::ParentClause(self_tref.clone(), clause_id),
-                        clause.trait_.clone(),
+                let type_constraints = {
+                    let mut type_constraints = self.compute_constraint_set(&tr.generics);
+                    let self_tref = TraitRef::new(
+                        TraitRefKind::SelfId,
+                        RegionBinder::empty(TraitDeclRef {
+                            id: tr.def_id,
+                            generics: Box::new(tr.generics.identity_args()),
+                        }),
                     );
-                    self.add_constraints_for_tref(&mut type_constraints, &tref);
-                }
-                type_constraints
-            };
+                    // Inherit known constraints from implied clauses.
+                    for (clause_id, clause) in tr.implied_clauses.iter_enumerated() {
+                        let tref = TraitRef::new(
+                            TraitRefKind::ParentClause(self_tref.clone(), clause_id),
+                            clause.trait_.clone(),
+                        );
+                        self.add_constraints_for_tref(&mut type_constraints, &tref);
+                    }
+                    type_constraints
+                };
 
-            let mut modifications =
-                ItemModifications::from_constraint_set(type_constraints, remove_assoc_types);
-            modifications.next_assoc_type_id = Some(tr.types.next_id());
-            if modifications.add_type_params {
-                // Remove all associated types and turn them into new parameters. We add these
-                // before the paths in `replace` because this gives a better output.
-                for (type_id, bound_assoc_ty) in tr.types.iter_enumerated() {
-                    if !bound_assoc_ty.binds_anything() {
-                        let path = TraitRefPath::self_ref(id).with_assoc_type(type_id);
+                let mut modifications =
+                    ItemModifications::from_constraint_set(type_constraints, remove_assoc_types);
+                modifications.next_assoc_type_id = Some(tr.types.next_id());
+                if modifications.add_type_params {
+                    // Remove all associated types and turn them into new parameters. We add these
+                    // before the paths in `replace` because this gives a better output.
+                    for (type_id, bound_assoc_ty) in tr.types.iter_enumerated() {
+                        if !bound_assoc_ty.binds_anything() {
+                            let path = TraitRefPath::self_ref(id).with_assoc_type(type_id);
+                            modifications.replace_path(path);
+                        }
+                    }
+                }
+                for path in replace {
+                    // In a cycle, a path into a trait of the cycle would give us ever longer
+                    // paths around it (`Self::A::B::A::B::Type`): make those associated types.
+                    if is_self_referential
+                        && modifications.add_type_params
+                        && !path.tref.parent_path.is_empty()
+                        && self.in_cycle(path.tref.trait_decl_id, id)
+                    {
+                        modifications.replace_cyclic_path(path);
+                    } else {
                         modifications.replace_path(path);
                     }
                 }
-            }
-            for path in replace {
-                modifications.replace_path(path);
-            }
 
-            self.trait_modifications[id] = CycleDetector::Processed(modifications);
+                if is_self_referential && remove_assoc_types {
+                    let params: Vec<_> = modifications.required_extra_params().cloned().collect();
+                    let assumed = self.provisional_params.get(&id);
+                    if assumed != Some(&params) {
+                        // The traits processed since we started relied on other parameters for
+                        // this one: undo them and try again with these, up to a few times
+                        // (each retry follows the parameters the previous one found).
+                        let attempts = self.lift_attempts.entry(id).or_default();
+                        *attempts += 1;
+                        if *attempts > MAX_CYCLE_ATTEMPTS {
+                            self.unliftable.insert(id);
+                            self.provisional_params.remove(&id);
+                        } else {
+                            self.provisional_params.insert(id, params);
+                        }
+                        for t in self.processed_traits.drain(undo_from.0..) {
+                            self.trait_modifications[t] = CycleDetector::Unprocessed;
+                        }
+                        for i in self.processed_impls.drain(undo_from.1..) {
+                            self.impl_assoc_tys[i] = CycleDetector::Unprocessed;
+                        }
+                        self.trait_modifications[id] = CycleDetector::Processing;
+                        continue;
+                    }
+                }
+                self.trait_modifications[id] = CycleDetector::Processed(modifications);
+                self.processed_traits.push(id);
+                break;
+            }
         }
         &self.trait_modifications[id]
     }
@@ -878,21 +980,34 @@ impl<'a> ComputeItemModifications<'a> {
     /// Returns the extra parameters that we add to the given trait. If we hadn't processed this
     /// trait before, we modify it to add the parameters in question and remove its associated
     /// types.
-    fn compute_extra_params_for_trait(
-        &mut self,
-        id: TraitDeclId,
-    ) -> impl Iterator<Item = &AssocTypePath> {
+    fn compute_extra_params_for_trait(&mut self, id: TraitDeclId) -> Vec<AssocTypePath> {
+        let lift = self
+            .ctx
+            .translated
+            .trait_decls
+            .get(id)
+            .is_some_and(|tr| self.lifts_assoc_types(tr));
         match self.compute_trait_modifications(id) {
-            CycleDetector::Unprocessed => None,
+            CycleDetector::Unprocessed => vec![],
             CycleDetector::Processing | CycleDetector::Cyclic => {
-                // We're recursively processing ourselves. We already know we won't add new type
-                // parameters, so we correctly return an empty iterator.
-                None
+                // We're recursively processing ourselves: assume the parameters of the previous
+                // attempt, or, the first time, the trait's own associated types. The trait checks
+                // the assumption once it is done (see `compute_trait_modifications`).
+                if self.unliftable.contains(&id) || !lift {
+                    vec![]
+                } else if let Some(params) = self.provisional_params.get(&id) {
+                    params.clone()
+                } else {
+                    let tr = &self.ctx.translated.trait_decls[id];
+                    tr.types
+                        .iter_enumerated()
+                        .filter(|(_, ty)| !ty.binds_anything())
+                        .map(|(type_id, _)| TraitRefPath::self_ref(id).with_assoc_type(type_id))
+                        .collect()
+                }
             }
-            CycleDetector::Processed(modifs) => Some(modifs.required_extra_params()),
+            CycleDetector::Processed(modifs) => modifs.required_extra_params().cloned().collect(),
         }
-        .into_iter()
-        .flatten()
     }
 
     fn compute_extra_params_for_clause<'b>(
@@ -903,6 +1018,7 @@ impl<'a> ComputeItemModifications<'a> {
         let trait_id = clause.trait_.skip_binder.id;
         let clause_path = clause_to_path(clause.clause_id, trait_id);
         self.compute_extra_params_for_trait(trait_id)
+            .into_iter()
             .map(move |path| path.on_tref(&clause_path))
     }
 
@@ -950,6 +1066,7 @@ impl<'a> ComputeItemModifications<'a> {
             );
 
             self.impl_assoc_tys[id] = CycleDetector::Processed(set);
+            self.processed_impls.push(id);
         }
         self.impl_assoc_tys[id].as_processed()
     }
@@ -1484,7 +1601,7 @@ impl TransformPass for Transform {
                     TyKind::TraitType(self_tref.clone(), new_type_id, GenericArgs::empty()).into_ty()
                 })
             } else {
-                modifications.compute_replacements(|path| {
+                let mut set = modifications.compute_replacements(|path| {
                     let var_id = item
                         .generic_params()
                         .types
@@ -1493,7 +1610,33 @@ impl TransformPass for Transform {
                             TypeParam::new(id, name, Variance::Invariant)
                         });
                     TyKind::TypeVar(DeBruijnVar::new_at_zero(var_id)).into_ty()
-                })
+                });
+                // A trait in a cycle: the paths around it become associated types, as above.
+                if let ItemRefMut::TraitDecl(tr) = &mut item {
+                    let self_tref = TraitRef::new(
+                        TraitRefKind::SelfId,
+                        RegionBinder::empty(TraitDeclRef {
+                            id: tr.def_id,
+                            generics: Box::new(tr.generics.identity_args()),
+                        }),
+                    );
+                    for path in &modifications.cyclic_paths {
+                        let new_type_name = TraitItemName(path.to_name(&ctx.translated).into());
+                        let new_type_id = ctx.translated.assoc_item_names[tr.def_id].types.push(new_type_name);
+                        tr.types.set_slot_extend(new_type_id, Binder::empty(
+                            BinderKind::TraitType(tr.def_id, new_type_id),
+                            TraitAssocTy {
+                                name: new_type_name,
+                                attr_info: AttrInfo::dummy_public(),
+                                default: None,
+                                implied_clauses: Default::default(),
+                            },
+                        ));
+                        let ty = TyKind::TraitType(self_tref.clone(), new_type_id, GenericArgs::empty()).into_ty();
+                        set.insert_path(path, ty);
+                    }
+                }
+                set
             };
 
             // Remove used constraints.
@@ -1505,7 +1648,10 @@ impl TransformPass for Transform {
             if let ItemRefMut::TraitDecl(tr) = &mut item
                 && modifications.add_type_params
             {
-                tr.types.retain(|_, assoc_ty| assoc_ty.binds_anything());
+                let first_new = modifications.next_assoc_type_id;
+                tr.types.retain(|id, assoc_ty| {
+                    assoc_ty.binds_anything() || first_new.is_some_and(|first| id >= first)
+                });
             }
 
             // Update the rest of the items: all the `GenericArgs` and the non-top-level binders
