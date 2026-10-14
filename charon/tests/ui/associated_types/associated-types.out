@@ -68,7 +68,7 @@ where
     TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (&'_0 T: MetaSized) = {built_in impl MetaSized for &'_0 T}
-    proof ImpliedClause1: (&'_0 T: Clone) = {impl Clone for &'_0 T}<'_, T>
+    proof ImpliedClause1: (&'_0 T: Clone) = {impl Clone for &'_0 T}<'_0, T>
     non-dyn-compatible
 }
 
@@ -209,7 +209,7 @@ where
     TypeOutlives0: T: 'a,
 {
     proof ImpliedClause0: (&'a T: MetaSized) = {built_in impl MetaSized for &'a T}
-    proof ImpliedClause1: (&'a T: Copy) = {impl Copy for &'_0 T}<'_, T>
+    proof ImpliedClause1: (&'a T: Copy) = {impl Copy for &'_0 T}<'a, T>
     proof ImpliedClause2: (Option<&'a T>[{built_in impl Sized for &'a T}]: Sized) = {built_in impl Sized for Option<&'a T>[{built_in impl Sized for &'a T}]}
     proof ImpliedClause3: (Option<&'a T>[{built_in impl Sized for &'a T}]: Clone) = impl_Clone_for_Option<&'_ T>[{built_in impl Sized for &'_ T}, {impl Clone for &'_0 T}<'_, T>, {built_in impl Destruct for &'_ T}]
     fn use_item_required = {impl test_crate::Foo<'a, Option<&'a T>[{built_in impl Sized for &'a T}]> for &'a T}::use_item_required<'a, T>[TraitClause0]
@@ -433,15 +433,15 @@ trait test_crate::loopy_with_generics::Foo<'b, Self, T, Self_FooTy, Self_Clause4
     vtable: test_crate::loopy_with_generics::Foo::{vtable}<'b, T, Self_FooTy>
 }
 
-// Full name: test_crate::loopy_with_generics::{impl test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]> for ()}
-impl "impl_Foo_u16_for_unit" test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]> for () {
+// Full name: test_crate::loopy_with_generics::{impl test_crate::loopy_with_generics::Foo<'static, u16, (), &'static Option<u16>[{built_in impl Sized for u16}]> for ()}
+impl "impl_Foo_u16_for_unit" test_crate::loopy_with_generics::Foo<'static, u16, (), &'static Option<u16>[{built_in impl Sized for u16}]> for () {
     proof ImpliedClause0: ((): MetaSized) = {built_in impl MetaSized for ()}
     proof ImpliedClause1: (u16: Sized) = {built_in impl Sized for u16}
     proof ImpliedClause2: ((): Sized) = {built_in impl Sized for ()}
-    proof ImpliedClause3: ((): test_crate::loopy_with_generics::Foo<'static, u16, (), &'_ Option<u16>[{built_in impl Sized for u16}]>) = impl_Foo_u16_for_unit
-    proof ImpliedClause4: ((): test_crate::loopy_with_generics::Bar<'static, u8, Option<u16>[{built_in impl Sized for u16}], &'_ Option<u16>[{built_in impl Sized for u16}]>) = impl_Bar_u8_for_unit<'_, Option<u16>[{built_in impl Sized for u16}]>[{built_in impl Sized for Option<u16>[{built_in impl Sized for u16}]}]
+    proof ImpliedClause3: ((): test_crate::loopy_with_generics::Foo<'static, u16, (), &'static Option<u16>[{built_in impl Sized for u16}]>) = impl_Foo_u16_for_unit
+    proof ImpliedClause4: ((): test_crate::loopy_with_generics::Bar<'static, u8, Option<u16>[{built_in impl Sized for u16}], &'static Option<u16>[{built_in impl Sized for u16}]>) = impl_Bar_u8_for_unit<'static, Option<u16>[{built_in impl Sized for u16}]>[{built_in impl Sized for Option<u16>[{built_in impl Sized for u16}]}]
     type Self_Clause3_FooTy = ()
-    type Self_Clause3_Clause4_BarTy = &'_ Option<u16>[{built_in impl Sized for u16}]
+    type Self_Clause3_Clause4_BarTy = &'static Option<u16>[{built_in impl Sized for u16}]
     vtable: lazy
 }
 

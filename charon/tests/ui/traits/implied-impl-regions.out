@@ -1,0 +1,174 @@
+# Final LLBC before serialization:
+
+// Full name: core::marker::MetaSized
+#[fundamental]
+#[lang_item(MetaSized)]
+pub trait MetaSized<Self>
+
+// Full name: core::marker::Sized
+#[fundamental]
+#[lang_item(Sized)]
+pub trait Sized<Self>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    non-dyn-compatible
+}
+
+// Full name: core::option::Option
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
+pub enum Option<T>
+where
+    TraitClause0: (T: Sized),
+{
+  None,
+  Some { _0: T },
+}
+
+// Full name: core::iter::traits::iterator::Iterator
+#[lang_item(Iterator)]
+#[diagnostic_item("Iterator")]
+pub trait Iterator<Self, Self_Item>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Self_Item: Sized)
+    fn next<'_0_1>;
+    vtable: core::iter::traits::iterator::Iterator::{vtable}<Self_Item>
+}
+
+// Full name: core::slice::iter::IterMut
+pub opaque type IterMut<mut 'a, T>
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+    TypeOutlives1: T: 'a,
+
+// Full name: core::slice::iter::{impl Iterator<&'a mut T> for IterMut<'a, T>[TraitClause0]}::next
+pub fn next<'a, '_1, T>(_1: &'_1 mut IterMut<'a, T>[TraitClause0]) -> Option<&'a mut T>[{built_in impl Sized for &'a mut T}]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: 'a: '_1,
+= <opaque>
+
+// Full name: core::slice::iter::{impl Iterator<&'a mut T> for IterMut<'a, T>[TraitClause0]}
+impl<'a, T> "impl_Iterator_for_IterMut" Iterator<&'a mut T> for IterMut<'a, T>[TraitClause0]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+{
+    proof ImpliedClause0: (IterMut<'a, T>[TraitClause0]: MetaSized) = {built_in impl MetaSized for IterMut<'a, T>[TraitClause0]}
+    proof ImpliedClause1: (&'a mut T: Sized) = {built_in impl Sized for &'a mut T}
+    fn next<'_0_1> = next<'a, '_0_1, T>[TraitClause0]
+    vtable: lazy
+}
+
+// Full name: core::slice::iter::{impl DoubleEndedIterator<&'a mut T> for IterMut<'a, T>[TraitClause0]}::next_back
+pub fn impl_DoubleEndedIterator_for_IterMut::next_back<'a, '_1, T>(_1: &'_1 mut IterMut<'a, T>[TraitClause0]) -> Option<&'a mut T>[{built_in impl Sized for &'a mut T}]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: 'a: '_1,
+= <opaque>
+
+// Full name: core::slice::{[T]}::iter_mut
+pub fn iter_mut<'_0, T>(_1: &'_0 mut [T]) -> IterMut<'_0, T>[TraitClause0]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: '_0,
+= <opaque>
+
+struct () {}
+
+struct (_, _)<A, B>
+where
+    TraitClause0: (A: Sized),
+{
+  _0: A,
+  _1: B,
+}
+
+struct (_,)<A> {
+  _0: A,
+}
+
+// Full name: test_crate::De
+pub trait De<Self, Self_Clause1_Item>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Self: Iterator<Self_Clause1_Item>)
+    fn next_back<'_0_1>;
+    vtable: test_crate::De::{vtable}<Self_Clause1_Item>
+}
+
+// Full name: test_crate::{impl De<&'a mut T> for IterMut<'a, T>[TraitClause0]}::next_back
+pub fn impl_De_for_IterMut::next_back<'a, '_1, T>(self: &'_1 mut IterMut<'a, T>[TraitClause0]) -> Option<&'a mut T>[{built_in impl Sized for &'a mut T}]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: 'a: '_1,
+{
+    let _0: Option<&'8 mut T>[{built_in impl Sized for &'8 mut T}]; // return
+    let self: &'15 mut IterMut<'16, T>[TraitClause0]; // arg #1
+    let _2: &'17 mut IterMut<'18, T>[TraitClause0]; // anonymous local
+
+    storage_live(_0)
+    storage_live(_2)
+    _2 = &two-phase-mut (*self)
+    _0 = impl_DoubleEndedIterator_for_IterMut::next_back<'20, '22, T>[TraitClause0](move _2)
+    ↳⚡ storage_dead(self)
+        unwind_continue
+    storage_dead(_2)
+    storage_dead(self)
+    return
+}
+
+// Full name: test_crate::{impl De<&'a mut T> for IterMut<'a, T>[TraitClause0]}
+impl<'a, T> "impl_De_for_IterMut" De<&'a mut T> for IterMut<'a, T>[TraitClause0]
+where
+    TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
+{
+    proof ImpliedClause0: (IterMut<'a, T>[TraitClause0]: MetaSized) = {built_in impl MetaSized for IterMut<'a, T>[TraitClause0]}
+    proof ImpliedClause1: (IterMut<'a, T>[TraitClause0]: Iterator<&'a mut T>) = impl_Iterator_for_IterMut<'a, T>[TraitClause0]
+    fn next_back<'_0_1> = impl_De_for_IterMut::next_back<'a, '_0_1, T>[TraitClause0]
+    vtable: lazy
+}
+
+// Full name: test_crate::last_mut
+pub fn last_mut<'_0>(a: &'_0 mut [u32]) -> Option<&'_0 mut u32>[{built_in impl Sized for &'_0 mut u32}]
+{
+    let _0: Option<&'8 mut u32>[{built_in impl Sized for &'8 mut u32}]; // return
+    let a: &'13 mut [u32]; // arg #1
+    let _2: &'17 mut IterMut<'18, u32>[{built_in impl Sized for u32}]; // anonymous local
+    let _3: &'19 mut IterMut<'20, u32>[{built_in impl Sized for u32}]; // anonymous local
+    let _4: IterMut<'21, u32>[{built_in impl Sized for u32}]; // anonymous local
+    let _5: &'22 mut [u32]; // anonymous local
+
+    storage_live(_0)
+    storage_live(_2)
+    storage_live(_3)
+    storage_live(_4)
+    storage_live(_5)
+    _5 = &two-phase-mut (*a) with_metadata(copy a.metadata)
+    _4 = iter_mut<'24, u32>[{built_in impl Sized for u32}](move _5)
+    ↳⚡ storage_dead(a)
+        unwind_continue
+    storage_dead(_5)
+    _3 = &mut _4
+    _2 = &two-phase-mut (*_3)
+    _0 = impl_De_for_IterMut::next_back<'26, '28, u32>[{built_in impl Sized for u32}](move _2)
+    ↳⚡ storage_dead(a)
+        unwind_continue
+    storage_dead(_2)
+    storage_dead(_4)
+    storage_dead(_3)
+    storage_dead(a)
+    return
+}
+
+
+
