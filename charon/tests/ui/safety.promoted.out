@@ -244,7 +244,7 @@ where
     TypeOutlives1: U: 'a,
 {
     proof ImpliedClause0: (&'a T: MetaSized) = {built_in impl MetaSized for &'a T}
-    proof ImpliedClause1: (&'a T: BuiltinDeref) = {impl BuiltinDeref for &'_0 T}<'_, T>
+    proof ImpliedClause1: (&'a T: BuiltinDeref) = {impl BuiltinDeref for &'_0 T}<'a, T>
     proof ImpliedClause2: (&'a U: Sized) = {built_in impl Sized for &'a U}
     type Output = &'a U
     non-dyn-compatible
