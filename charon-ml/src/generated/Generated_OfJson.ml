@@ -2347,6 +2347,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc
         [
           ("ullbc", ullbc);
+          ("no_code_duplication", no_code_duplication);
           ("precise_drops", precise_drops);
           ("mir", mir);
           ("rustc_args", rustc_args);
@@ -2412,6 +2413,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
           ("preset", preset);
         ] ->
         let* ullbc = bool_of_json ctx ullbc in
+        let* no_code_duplication = bool_of_json ctx no_code_duplication in
         let* precise_drops = bool_of_json ctx precise_drops in
         let* mir = option_of_json mir_level_of_json ctx mir in
         let* rustc_args = list_of_json string_of_json ctx rustc_args in
@@ -2502,6 +2504,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
         Ok
           ({
              ullbc;
+             no_code_duplication;
              precise_drops;
              mir;
              rustc_args;
@@ -2576,12 +2579,14 @@ and closure_info_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc
         [
           ("kind", kind);
+          ("closure_body", closure_body);
           ("fn_once_impl", fn_once_impl);
           ("fn_mut_impl", fn_mut_impl);
           ("fn_impl", fn_impl);
           ("signature", signature);
         ] ->
         let* kind = closure_kind_of_json ctx kind in
+        let* closure_body = fun_decl_ref_of_json ctx closure_body in
         let* fn_once_impl =
           region_binder_of_json trait_impl_ref_of_json ctx fn_once_impl
         in
@@ -2597,7 +2602,7 @@ and closure_info_of_json (ctx : of_json_ctx) (js : json) :
         in
         let* signature = region_binder_of_json fun_sig_of_json ctx signature in
         Ok
-          ({ kind; fn_once_impl; fn_mut_impl; fn_impl; signature }
+          ({ kind; closure_body; fn_once_impl; fn_mut_impl; fn_impl; signature }
             : closure_info)
     | _ -> Error "")
 

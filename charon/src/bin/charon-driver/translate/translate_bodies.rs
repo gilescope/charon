@@ -6,6 +6,7 @@
 use itertools::Itertools;
 use rustc_attr_ir::LangItem;
 use rustc_hash::FxHashMap as HashMap;
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::mem;
 use std::ops::Deref;
@@ -218,7 +219,9 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         // Retrieve the body
         if let Some(body) = self.get_mir(def.this(), span)? {
             Ok(self.translate_body(span, body, &def.source_text))
-        } else if let Some(value) = self.evaluate_const_def(def) {
+        } else if let Some(value) =
+            def.evaluate(self.hax_state_with_id(), hax::ReadMode::Structured)
+        {
             // For globals without MIR, generate a body by evaluating the global. This is how we
             // get the value of statics (which have no cross-crate MIR at all) and of "trivial"
             // consts (whose value rustc stores directly instead of encoding MIR for it).
@@ -2164,7 +2167,7 @@ impl<'a> IntoFormatter for &'a BodyTransCtx<'_, '_, '_> {
     type C = FmtCtx<'a>;
     fn into_fmt(self) -> Self::C {
         FmtCtx {
-            local_names: Some(compute_local_names(&self.locals)),
+            local_names: Some(Cow::Owned(compute_local_names(&self.locals))),
             ..self.i_ctx.into_fmt()
         }
     }

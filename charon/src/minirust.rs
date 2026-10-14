@@ -1,13 +1,9 @@
 //! Translate a monomorphized ULLBC crate into MiniRust program.
 //!
-//! Unsupported features (we translate this incorrectly):
-//! - Pointers to statics that aren't at offset 0;
-//! - `#[track_caller]`;
-//! - Precise union padding: we preserve every byte of a union, including bytes Rust may treat as padding;
+//! See the [manual] for known unsupported features.
 //!
-//! Unsupported features (will raise an error):
-//! - `dyn Trait` upcasting;
-//! - `CoerceUnsized` pointers;
+//! [manual]: https://aeneasverif.github.io/charon/manual/minirust.html#known-unsupported-features
+// Reminder to keep the manual page updated as we add more support for features.
 use itertools::Itertools;
 use minirust_rs::{mem::TreeBorrowsMemory, prelude::TerminationInfo};
 use miniutil::build as mb;
