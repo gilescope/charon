@@ -100,7 +100,7 @@ where
     TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (&'_0 T: MetaSized) = {built_in impl MetaSized for &'_0 T}
-    proof ImpliedClause1: (&'_0 T: Clone) = {impl Clone for &'_0 T}<'_, T>
+    proof ImpliedClause1: (&'_0 T: Clone) = {impl Clone for &'_0 T}<'_0, T>
     non-dyn-compatible
 }
 
